@@ -1,0 +1,12 @@
+[package]
+name = "rumenu"
+version = "0.1.0"
+authors = ["Jesús Espino <jespinog@gmail.com>"]
+
+[dependencies]
+libc = "*"
+getopts = "*"
+
+[dependencies.x11]
+path = "/home/jespino/Aprendiendo/rust/x11-rs/x11"
+features = ["xlib"]
