@@ -2,13 +2,10 @@ use std::ffi::CString;
 use std::mem::zeroed;
 use std::cmp::max;
 use std::str::from_utf8;
-use std::str::FromStr;
-use std::convert::Into;
 use std::convert::From;
 use std::thread::sleep_ms;
 use std::env;
 use std::ptr::{
-  null,
   null_mut,
   read,
 };
@@ -28,7 +25,6 @@ pub struct UI {
     h: u32,
     display: *mut xlib::Display,
     window: xlib::Window,
-    root: xlib::Window,
     gc: xlib::GC,
     xfont: *mut xlib::XFontStruct,
     colfg: u64,
@@ -41,7 +37,7 @@ pub struct UI {
 impl UI {
     fn setup_keyboard(display: *mut xlib::Display) {
         /* try to grab keyboard, we may have to wait for another process to ungrab */
-        for i in 1..1000 {
+        for _ in 1..1000 {
             unsafe {
                 if xlib::XGrabKeyboard(display, xlib::XDefaultRootWindow(display), 1, xlib::GrabModeAsync, xlib::GrabModeAsync, xlib::CurrentTime) == xlib::GrabSuccess {
                     return
@@ -188,7 +184,6 @@ impl UI {
             h: height,
             display: display,
             window: window,
-            root: root,
             gc: gc,
             xfont: xfont,
             colfg: color_fg,
@@ -268,7 +263,7 @@ impl UI {
         self.draw_bg(0, 0, self.w, self.h, false);
         let max_item_length = status.items.iter().fold(0, |acc, item| max(acc, item.len()));
 
-        let input_width = (self.text_width(&"_".to_string()) * max_item_length as u32);
+        let input_width = self.text_width(&"_".to_string()) * max_item_length as u32;
         let font_height = self.text_height();
         let mut current_x_pos = 2;
 
@@ -296,10 +291,9 @@ impl UI {
         } else {
             // Draw horizontal matches
             for match_item in &status.matches {
-                if (self.text_width(&match_item) + (current_x_pos as u32) > self.w - self.text_width(&">".to_string())) {
+                if self.text_width(&match_item) + (current_x_pos as u32) > self.w - self.text_width(&">".to_string()) {
                     // Draw next icon and break
                     self.draw_text(current_x_pos, font_height as i32, &">".to_string(), false);
-                    current_x_pos += (self.text_width(&">".to_string()) + 4) as i32;
                     break
                 } else {
                     self.draw_text(current_x_pos, font_height as i32, &match_item, *match_item == status.selected);
@@ -312,7 +306,7 @@ impl UI {
     fn keypress(&mut self, event: &mut xlib::XKeyPressedEvent, status: &mut super::Status) {
         let mut buf = [0 as i8; 32];
         let mut buf_u8 = [0 as u8; 32];
-        let mut ksym: u32 = 0;
+        let mut ksym: u32;
         let old_text = status.text.clone();
 
         unsafe {
@@ -326,7 +320,7 @@ impl UI {
 
         let input = String::from_utf8_lossy(&buf_u8);
 
-        if(event.state & xlib::ControlMask != 0) {
+        if event.state & xlib::ControlMask != 0 {
             match ksym {
                 keysym::XK_a => ksym = keysym::XK_Home,
                 keysym::XK_b => ksym = keysym::XK_Left,
@@ -359,7 +353,7 @@ impl UI {
                 // },
                 _ => return,
             }
-        } else if(event.state & xlib::Mod1Mask != 0) {
+        } else if event.state & xlib::Mod1Mask != 0 {
             match ksym  {
                 keysym::XK_g => ksym = keysym::XK_Home,
                 keysym::XK_G => ksym = keysym::XK_End,
@@ -384,7 +378,7 @@ impl UI {
                 }
             },
             keysym::XK_End => {
-                if(self.cursor < status.text.len()) {
+                if self.cursor < status.text.len() {
                     self.cursor = status.text.len();
                 } else {
                     status.selected = status.matches.last().unwrap_or(&"".to_string()).clone();
@@ -400,13 +394,13 @@ impl UI {
             },
             keysym::XK_Left => {
                 if status.selected == status.matches.first().unwrap_or(&"".to_string()).clone() {
-                    if(self.cursor > 0) {
+                    if self.cursor > 0 {
                         self.cursor -= 1;
                     }
-                } else if(status.settings.lines == 0) {
+                } else if status.settings.lines == 0 {
                     status.selected = match status.matches.binary_search(&status.selected) {
                         Ok(n) => status.matches[n - 1].clone(),
-                        Err(n) => "".to_string()
+                        Err(_) => "".to_string()
                     }
                 }
             },
@@ -414,17 +408,17 @@ impl UI {
                 match status.matches.binary_search(&status.selected) {
                     Ok(0) => return,
                     Ok(n) => status.selected = status.matches[n - 1].clone(),
-                    Err(n) => return
+                    Err(_) => return
                 }
             },
             // TODO: Review and understand well this
             // keysym::XK_Next => {
-            //     if(!next) { return; }
+            //     if !next { return; }
             //     sel = curr = next;
             //     calcoffsets();
             // },
             // keysym::XK_Prior => {
-            //     if(!prev) { return; }
+            //     if !prev { return; }
             //     sel = curr = prev;
             //     calcoffsets();
             // },
@@ -456,7 +450,7 @@ impl UI {
                                 return
                             }
                         },
-                        Err(n) => return
+                        Err(_) => return
                     }
                 }
             },
@@ -469,17 +463,17 @@ impl UI {
                             return
                         }
                     },
-                    Err(n) => return
+                    Err(_) => return
                 }
             },
             keysym::XK_Tab => {
-                if(status.selected != "") {
+                if status.selected != "" {
                     status.text = status.selected.clone();
                     self.cursor = status.text.len();
                 }
             },
             _ => unsafe {
-                if(iscntrl(input.chars().nth(0).unwrap_or(0 as char) as i32) == 0) {
+                if iscntrl(input.chars().nth(0).unwrap_or(0 as char) as i32) == 0 {
                     status.text.insert(self.cursor, input.chars().nth(0).unwrap());
                     self.cursor += 1;
                 }
@@ -494,9 +488,9 @@ impl UI {
         self.draw_menu(&status);
     }
 
-    fn paste(&self) {
-        panic!("Not implemented");
-    }
+    // fn paste(&self) {
+    //     panic!("Not implemented");
+    // }
 
     pub fn run(&mut self, mut status: super::Status) {
         self.draw_menu(&status);
@@ -504,13 +498,13 @@ impl UI {
         unsafe {
             let mut ev: xlib::XEvent = zeroed();
 
-            while(!xlib::XNextEvent(self.display, &mut ev) != 0) {
-                if(xlib::XFilterEvent(&mut ev, self.window) != 0) { continue; }
+            while !xlib::XNextEvent(self.display, &mut ev) != 0 {
+                if xlib::XFilterEvent(&mut ev, self.window) != 0 { continue; }
                 match ev.get_type() {
-                    xlib::Expose => if(xlib::XExposeEvent::from(ev).count == 0) { self.draw_menu(&status); },
+                    xlib::Expose => if xlib::XExposeEvent::from(ev).count == 0 { self.draw_menu(&status); },
                     xlib::KeyPress => self.keypress(&mut xlib::XKeyPressedEvent::from(ev), &mut status),
-                    // xlib::SelectionNotify => if(xlib::XSelectionEvent::from(ev).property == utf8) { self.paste(); },
-                    xlib::VisibilityNotify => if(xlib::XVisibilityEvent::from(ev).state != xproto::VisibilityUnobscured) { xlib::XRaiseWindow(self.display, self.window); },
+                    // xlib::SelectionNotify => if xlib::XSelectionEvent::from(ev).property == utf8 { self.paste(); },
+                    xlib::VisibilityNotify => if xlib::XVisibilityEvent::from(ev).state != xproto::VisibilityUnobscured { xlib::XRaiseWindow(self.display, self.window); },
                     _ => continue
                 }
             }

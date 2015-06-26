@@ -4,7 +4,7 @@ version = "0.1.0"
 dependencies = [
  "getopts 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "x11 1.0.0",
+ "x11 1.2.0",
 ]
 
 [[package]]
@@ -30,14 +30,14 @@ dependencies = [
 
 [[package]]
 name = "pkg-config"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "x11"
-version = "1.0.0"
+version = "1.2.0"
 dependencies = [
  "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "pkg-config 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pkg-config 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

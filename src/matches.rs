@@ -3,7 +3,7 @@ pub fn simple_match(text: &String, items: &Vec<String>) -> Vec<String> {
 
     for item in items {
         match item.find(text) {
-            Some(position) => {matches.push(item.clone())},
+            Some(_) => {matches.push(item.clone())},
             None => continue
         }
     }

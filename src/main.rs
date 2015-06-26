@@ -7,10 +7,7 @@ mod ui;
 
 use ui::UI;
 use matches::simple_match;
-use std::str::from_utf8;
 use std::str::FromStr;
-use std::convert::Into;
-use std::convert::From;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::fs::File;
@@ -18,6 +15,8 @@ use std::env;
 use std::iter::Iterator;
 
 use getopts::Options;
+
+const VERSION: &'static str = "0.0.1";
 
 pub struct Settings {
     topbar: bool,
@@ -106,8 +105,16 @@ fn main () {
         Err(f) => { panic!(f.to_string()) }
     };
 
-    // if matches.opt_present("v") { print_version(&program); return; }
-    // if matches.opt_present("h") { usage(&program, opts); return; }
+    if matches.opt_present("v") {
+        println!("rumenu-{}, © 2015 Jesús Espino, see LICENSE for details", VERSION);
+        return;
+    }
+
+    if matches.opt_present("h") {
+        let brief = format!("Usage: {} [options]", program);
+        print!("{}", opts.usage(&brief));
+        return;
+    }
 
     settings.topbar = matches.opt_present("b");
     settings.fast = matches.opt_present("f");
