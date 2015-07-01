@@ -15,7 +15,6 @@ use libc::c_int;
 use libc::exit;
 use libc::funcs::c95::ctype::iscntrl;
 use x11::xlib;
-use x11::xproto;
 use x11::keysym;
 
 pub struct UI {
@@ -111,8 +110,8 @@ impl UI {
             xlib::XSetForeground(display, gc, color_fg);
             xlib::XSetBackground(display, gc, color_bg);
 
-            xlib::XSetLineAttributes(display, gc, 1, xproto::LineSolid, xproto::CapButt, xproto::JoinMiter);
-            xlib::XSetFillStyle(display, gc, xproto::FillSolid);
+            xlib::XSetLineAttributes(display, gc, 1, xlib::LineSolid, xlib::CapButt, xlib::JoinMiter);
+            xlib::XSetFillStyle(display, gc, xlib::FillSolid);
 
             xlib::XSync(display, 1);
             xlib::XFlush(display);
@@ -480,7 +479,11 @@ impl UI {
             },
         }
         if old_text != status.text {
-            status.matches = super::matches::simple_match(&status.text, &status.items);
+            if status.settings.matcher == "ctrlp" {
+                status.matches = super::matches::ctrlp_match(&status.text, &status.items);
+            } else {
+                status.matches = super::matches::simple_match(&status.text, &status.items);
+            }
             if !status.matches.contains(&status.selected) {
                 status.selected = status.matches.first().unwrap_or(&"".to_string()).clone()
             }
@@ -504,7 +507,7 @@ impl UI {
                     xlib::Expose => if xlib::XExposeEvent::from(ev).count == 0 { self.draw_menu(&status); },
                     xlib::KeyPress => self.keypress(&mut xlib::XKeyPressedEvent::from(ev), &mut status),
                     // xlib::SelectionNotify => if xlib::XSelectionEvent::from(ev).property == utf8 { self.paste(); },
-                    xlib::VisibilityNotify => if xlib::XVisibilityEvent::from(ev).state != xproto::VisibilityUnobscured { xlib::XRaiseWindow(self.display, self.window); },
+                    xlib::VisibilityNotify => if xlib::XVisibilityEvent::from(ev).state != xlib::VisibilityUnobscured { xlib::XRaiseWindow(self.display, self.window); },
                     _ => continue
                 }
             }

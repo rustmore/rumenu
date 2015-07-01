@@ -7,6 +7,7 @@ mod ui;
 
 use ui::UI;
 use matches::simple_match;
+use matches::ctrlp_match;
 use std::str::FromStr;
 use std::io::BufRead;
 use std::io::BufReader;
@@ -30,6 +31,7 @@ pub struct Settings {
     selbgcolor: String,
     selfgcolor: String,
     cache_file: String,
+    matcher: String,
 }
 
 impl Settings {
@@ -46,6 +48,7 @@ impl Settings {
             selbgcolor: "rgb:00/55/77".to_string(),
             selfgcolor: "rgb:ee/ee/ee".to_string(),
             cache_file: "-".to_string(),
+            matcher: "simple".to_string(),
         }
     }
 }
@@ -94,6 +97,7 @@ fn main () {
     opts.optopt("l", "lines", "lines of vertical list", "LINES");
     opts.optopt("c", "cache", "cache file with available commands", "CACHE_FILE");
     opts.optopt("p", "prompt", "add prompt to left of input field", "PROMPT");
+    opts.optopt("m", "matcher", "select matcher function", "simple|ctrlp");
     opts.optopt("", "font", "font or font set", "FONT");
     opts.optopt("", "background", "normal background color", "NBG");
     opts.optopt("", "foreground", "normal foreground color", "NFG");
@@ -133,6 +137,7 @@ fn main () {
     }
 
     settings.prompt =  matches.opt_str("p").unwrap_or(String::new());
+    settings.matcher =  matches.opt_str("m").unwrap_or("simple".to_string());
     settings.font = matches.opt_str("font").unwrap_or("fixed".to_string());
     settings.normbgcolor = matches.opt_str("background").unwrap_or("rgb:22/22/22".to_string());
     settings.normfgcolor = matches.opt_str("foreground").unwrap_or("rgb:bb/bb/bb".to_string());
@@ -154,7 +159,13 @@ fn main () {
     };
 
     status.items.sort();
-    status.matches = simple_match(&status.text, &status.items);
+
+    if status.settings.matcher == "ctrlp" {
+        status.matches = ctrlp_match(&status.text, &status.items);
+    } else {
+        status.matches = simple_match(&status.text, &status.items);
+    }
+
     status.selected = status.matches.first().unwrap_or(&"".to_string()).clone();
     ui.run(status);
 }

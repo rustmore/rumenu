@@ -8,5 +8,5 @@ libc = "*"
 getopts = "*"
 
 [dependencies.x11]
-path = "/home/jespino/Aprendiendo/rust/x11-rs/x11"
+path = "/home/jespino/Projects/Github/x11-rs/x11"
 features = ["xlib"]
