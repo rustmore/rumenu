@@ -193,6 +193,36 @@ impl UI {
         }
     }
 
+    fn get_items_page(&self, status: &super::Status, page: u32) -> (Vec<String>, u32) {
+        let mut current_page = 0;
+
+        // Calculate the space for the words
+        let max_item_length = status.items.iter().fold(0, |acc, item| max(acc, item.len()));
+        let input_width = self.text_width(&"_".to_string()) as i32 * max_item_length as i32;
+        let mut words_width = self.w as i32;
+        words_width -= 2;
+        words_width -= self.text_width(&status.settings.prompt) as i32 + 4;
+        words_width -= input_width + 8;
+        words_width -= self.text_width(&"<".to_string()) as i32 + 4;
+        words_width -= self.text_width(&">".to_string()) as i32 - 7;
+
+        let mut page_items = vec![];
+        let mut current_x_pos = 0;
+        for item in &status.matches {
+            let item_width = (self.text_width(&item) + 4) as i32;
+            if current_x_pos + item_width > words_width {
+                current_page += 1;
+                current_x_pos = item_width;
+            } else {
+                current_x_pos += item_width;
+                if current_page == page {
+                    page_items.push(item.clone());
+                }
+            }
+        }
+        (page_items, current_page + 1)
+    }
+
     fn draw_bg(&self, x: i32, y: i32, w: u32, h: u32, selected: bool) {
         unsafe {
             if selected {
@@ -269,7 +299,7 @@ impl UI {
         // Draw Prompt
         if status.settings.prompt != "" {
             self.draw_text(current_x_pos, font_height as i32, &status.settings.prompt, false);
-            current_x_pos += (self.text_width(&status.settings.prompt) + 4) as i32;
+            current_x_pos += self.text_width(&status.settings.prompt) as i32 + 4;
         }
 
         // Draw input
@@ -281,7 +311,7 @@ impl UI {
         // Draw prev icon
         if status.page > 0 {
             self.draw_text(current_x_pos, font_height as i32, &"<".to_string(), false);
-            current_x_pos += (self.text_width(&"<".to_string()) + 4) as i32;
+            current_x_pos += self.text_width(&"<".to_string()) as i32 + 4;
         }
 
         if status.settings.lines > 0 {
@@ -289,15 +319,15 @@ impl UI {
             // TODO
         } else {
             // Draw horizontal matches
-            for match_item in &status.matches {
-                if self.text_width(&match_item) + (current_x_pos as u32) > self.w - self.text_width(&">".to_string()) - 7 {
-                    // Draw next icon and break
-                    self.draw_text(self.w as i32 - self.text_width(&">".to_string()) as i32 - 5, font_height as i32, &">".to_string(), false);
-                    break
-                } else {
-                    self.draw_text(current_x_pos, font_height as i32, &match_item, *match_item == status.selected);
-                    current_x_pos += (self.text_width(&match_item) + 4) as i32;
-                }
+            let (match_items, pages) = self.get_items_page(&status, status.page);
+            if pages > status.page + 1 {
+                // Draw next icon and break
+                self.draw_text(self.w as i32 - self.text_width(&">".to_string()) as i32 - 5, font_height as i32, &">".to_string(), false);
+            }
+
+            for match_item in match_items {
+                self.draw_text(current_x_pos, font_height as i32, &match_item, *match_item == status.selected);
+                current_x_pos += (self.text_width(&match_item) + 4) as i32;
             }
         }
     }
@@ -410,17 +440,15 @@ impl UI {
                     Err(_) => return
                 }
             },
-            // TODO: Review and understand well this
-            // keysym::XK_Next => {
-            //     if !next { return; }
-            //     sel = curr = next;
-            //     calcoffsets();
-            // },
-            // keysym::XK_Prior => {
-            //     if !prev { return; }
-            //     sel = curr = prev;
-            //     calcoffsets();
-            // },
+            keysym::XK_Next => {
+                // TODO: Calc the number of pages
+                status.page += 1
+            },
+            keysym::XK_Prior => {
+                if status.page > 0 {
+                    status.page -= 1
+                }
+            },
             keysym::XK_Return => {
                 if (event.state & xlib::ShiftMask) != 0 || status.selected == "" {
                     println!("{}", status.text)
@@ -486,6 +514,7 @@ impl UI {
             } else {
                 status.matches = super::matches::simple_match(&status.text, &status.items);
             }
+            status.page = 0;
             if !status.matches.contains(&status.selected) {
                 status.selected = status.matches.first().unwrap_or(&"".to_string()).clone()
             }
