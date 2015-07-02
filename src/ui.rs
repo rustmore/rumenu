@@ -481,6 +481,8 @@ impl UI {
         if old_text != status.text {
             if status.settings.matcher == "fuzzy" {
                 status.matches = super::matches::fuzzy_match(&status.text, &status.items);
+            } else if status.settings.matcher == "dmenu" {
+                status.matches = super::matches::dmenu_match(&status.text, &status.items);
             } else {
                 status.matches = super::matches::simple_match(&status.text, &status.items);
             }

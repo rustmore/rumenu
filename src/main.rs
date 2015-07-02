@@ -8,6 +8,7 @@ mod ui;
 use ui::UI;
 use matches::simple_match;
 use matches::fuzzy_match;
+use matches::dmenu_match;
 use std::str::FromStr;
 use std::io::BufRead;
 use std::io::BufReader;
@@ -97,7 +98,7 @@ fn main () {
     opts.optopt("l", "lines", "lines of vertical list", "LINES");
     opts.optopt("c", "cache", "cache file with available commands", "CACHE_FILE");
     opts.optopt("p", "prompt", "add prompt to left of input field", "PROMPT");
-    opts.optopt("m", "matcher", "select matcher function", "simple|fuzzy");
+    opts.optopt("m", "matcher", "select matcher function", "simple|dmenu|fuzzy");
     opts.optopt("", "font", "font or font set", "FONT");
     opts.optopt("", "background", "normal background color", "NBG");
     opts.optopt("", "foreground", "normal foreground color", "NFG");
@@ -162,6 +163,8 @@ fn main () {
 
     if status.settings.matcher == "fuzzy" {
         status.matches = fuzzy_match(&status.text, &status.items);
+    } else if status.settings.matcher == "dmenu" {
+        status.matches = dmenu_match(&status.text, &status.items);
     } else {
         status.matches = simple_match(&status.text, &status.items);
     }

@@ -17,6 +17,50 @@ pub fn simple_match(text: &String, items: &Vec<String>) -> Vec<String> {
     results
 }
 
+pub fn dmenu_match(text: &String, items: &Vec<String>) -> Vec<String> {
+    let mut matches_exact = vec![];
+    let mut matches_prefix = vec![];
+    let mut matches_substring = vec![];
+
+    if text.len() == 0 { return items.clone() }
+
+    let words: Vec<&str> = text.split_whitespace().collect();
+    for item in items {
+        let mut exact = false;
+        let mut prefix = false;
+        let mut substring = false;
+
+        for word in &words {
+            match item.find(word) {
+                Some(0) => {
+                    if word == item { exact = true }
+                    else { prefix = true }
+                },
+                Some(_) => substring = true,
+                None => {
+                    exact = false;
+                    prefix = false;
+                    substring = false;
+                    break
+                }
+            }
+        }
+
+        if exact {
+            matches_exact.push(item.clone())
+        } else if prefix {
+            matches_prefix.push(item.clone())
+        } else if substring {
+            matches_substring.push(item.clone())
+        }
+    }
+    let mut results = vec![];
+    results.extend(matches_exact);
+    results.extend(matches_prefix);
+    results.extend(matches_substring);
+    results
+}
+
 pub fn fuzzy_match(text: &String, items: &Vec<String>) -> Vec<String> {
     let mut matches = vec![];
 
