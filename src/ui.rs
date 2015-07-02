@@ -290,9 +290,9 @@ impl UI {
         } else {
             // Draw horizontal matches
             for match_item in &status.matches {
-                if self.text_width(&match_item) + (current_x_pos as u32) > self.w - self.text_width(&">".to_string()) {
+                if self.text_width(&match_item) + (current_x_pos as u32) > self.w - self.text_width(&">".to_string()) - 7 {
                     // Draw next icon and break
-                    self.draw_text(current_x_pos, font_height as i32, &">".to_string(), false);
+                    self.draw_text(self.w as i32 - self.text_width(&">".to_string()) as i32 - 5, font_height as i32, &">".to_string(), false);
                     break
                 } else {
                     self.draw_text(current_x_pos, font_height as i32, &match_item, *match_item == status.selected);
