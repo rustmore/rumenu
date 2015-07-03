@@ -159,8 +159,6 @@ fn main () {
         settings: settings,
     };
 
-    status.items.sort();
-
     if status.settings.matcher == "fuzzy" {
         status.matches = fuzzy_match(&status.text, &status.items);
     } else if status.settings.matcher == "dmenu" {
