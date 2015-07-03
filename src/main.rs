@@ -22,7 +22,6 @@ const VERSION: &'static str = "0.0.1";
 
 pub struct Settings {
     topbar: bool,
-    fast: bool,
     casesensitive: bool,
     lines: u32,
     prompt: String,
@@ -33,25 +32,6 @@ pub struct Settings {
     selfgcolor: String,
     cache_file: String,
     matcher: String,
-}
-
-impl Settings {
-    fn new() -> Settings{
-        Settings {
-            topbar: false,
-            fast: false,
-            casesensitive: true,
-            lines: 0,
-            prompt: String::new(),
-            font: "fixed".to_string(),
-            normbgcolor: "rgb:22/22/22".to_string(),
-            normfgcolor: "rgb:bb/bb/bb".to_string(),
-            selbgcolor: "rgb:00/55/77".to_string(),
-            selfgcolor: "rgb:ee/ee/ee".to_string(),
-            cache_file: "-".to_string(),
-            matcher: "simple".to_string(),
-        }
-    }
 }
 
 struct Status {
@@ -82,16 +62,10 @@ fn readitems(settings: &Settings) -> Vec<String> {
     items
 }
 
-fn main () {
-    let args: Vec<String> = env::args().collect();
-    let program = args[0].clone();
-
-    let mut settings = Settings::new();
-
+fn parse_args(args: Vec<String>) -> (bool, Settings) {
     let mut opts = Options::new();
     opts.optflag("v", "version", "show version");
     opts.optflag("b", "topbar", "show topbar");
-    opts.optflag("f", "fast", "fast start");
     opts.optflag("h", "help", "show help");
     opts.optflag("i", "caseinsensitive", "activate case insensitive");
 
@@ -110,41 +84,45 @@ fn main () {
         Err(f) => { panic!(f.to_string()) }
     };
 
+    let lines = match matches.opt_str("l") {
+        Some(lines_str) => {
+            u32::from_str(lines_str.trim()).unwrap_or(0)
+        },
+        None => 0
+    };
+
+    let settings = Settings {
+        topbar: matches.opt_present("b"),
+        casesensitive: !matches.opt_present("i"),
+        lines: lines,
+        prompt:  matches.opt_str("p").unwrap_or(String::new()),
+        matcher:  matches.opt_str("m").unwrap_or("simple".to_string()),
+        font: matches.opt_str("font").unwrap_or("fixed".to_string()),
+        normbgcolor: matches.opt_str("background").unwrap_or("rgb:22/22/22".to_string()),
+        normfgcolor: matches.opt_str("foreground").unwrap_or("rgb:bb/bb/bb".to_string()),
+        selbgcolor: matches.opt_str("sbackground").unwrap_or("rgb:00/55/77".to_string()),
+        selfgcolor: matches.opt_str("sforeground").unwrap_or("rgb:ee/ee/ee".to_string()),
+        cache_file: matches.opt_str("cache").unwrap_or("-".to_string()),
+    };
+
+    let mut exit = false;
     if matches.opt_present("v") {
         println!("rumenu-{}, © 2015 Jesús Espino, see LICENSE for details", VERSION);
-        return;
+        exit = true;
     }
-
     if matches.opt_present("h") {
-        let brief = format!("Usage: {} [options]", program);
+        let brief = format!("Usage: {} [options]", args[0].clone());
         print!("{}", opts.usage(&brief));
-        return;
+        exit = true
     }
+    (exit, settings)
+}
 
-    settings.topbar = matches.opt_present("b");
-    settings.fast = matches.opt_present("f");
-    settings.casesensitive = !matches.opt_present("i");
+fn main () {
+    let args: Vec<String> = env::args().collect();
 
-    match matches.opt_str("l") {
-        Some(lines_str) => {
-            match u32::from_str(lines_str.trim()) {
-                Ok(l) => { settings.lines = l }
-                Err(f) => { println!("{}", f.to_string()); return }
-            }
-        }
-        None => {
-            settings.lines = 0
-        }
-    }
-
-    settings.prompt =  matches.opt_str("p").unwrap_or(String::new());
-    settings.matcher =  matches.opt_str("m").unwrap_or("simple".to_string());
-    settings.font = matches.opt_str("font").unwrap_or("fixed".to_string());
-    settings.normbgcolor = matches.opt_str("background").unwrap_or("rgb:22/22/22".to_string());
-    settings.normfgcolor = matches.opt_str("foreground").unwrap_or("rgb:bb/bb/bb".to_string());
-    settings.selbgcolor = matches.opt_str("sbackground").unwrap_or("rgb:00/55/77".to_string());
-    settings.selfgcolor = matches.opt_str("sforeground").unwrap_or("rgb:ee/ee/ee".to_string());
-    settings.cache_file = matches.opt_str("cache").unwrap_or("-".to_string());
+    let (exit, settings) = parse_args(args);
+    if exit { return; }
 
     let mut ui = UI::new(&settings);
 
