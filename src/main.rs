@@ -4,6 +4,7 @@ extern crate getopts;
 
 mod matches;
 mod ui;
+mod xmini;
 
 use ui::UI;
 use matches::simple_match;
@@ -45,7 +46,7 @@ struct Status {
 
 fn readitems(settings: &Settings) -> Vec<String> {
     let mut items = vec![];
-    let mut input_items: Vec<_>;
+    let input_items: Vec<_>;
 
     if settings.cache_file == "-" {
         let stdin = std::io::stdin();

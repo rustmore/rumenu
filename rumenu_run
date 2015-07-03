@@ -7,8 +7,8 @@ else
 fi
 (
 	IFS=:
-	if stest -dqr -n "$cache" $PATH; then
-		stest -flx $PATH | sort -u | tee "$cache" | rumenu "$@"
+	if rutest -dqr -n "$cache" $PATH; then
+		rutest -flx $PATH | sort -u | tee "$cache" | rumenu "$@"
 	else
 		rumenu "$@" < "$cache"
 	fi

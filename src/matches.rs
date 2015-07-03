@@ -62,6 +62,24 @@ pub fn dmenu_match(text: &String, items: &Vec<String>) -> Vec<String> {
 }
 
 pub fn fuzzy_match(text: &String, items: &Vec<String>) -> Vec<String> {
+    fn fuzzy_find_match(text: &String, item: &String) -> (String, f64) {
+        let mut score = 1.0;
+        let mut item_copy = item.clone();
+
+        for c in text.chars() {
+            score += match item_copy.find(c) {
+                Some(position) => (10.0 - position as f64),
+                None => {
+                    score = 0.0;
+                    break
+                }
+            };
+            item_copy = item_copy.chars().skip_while(|&x| x != c).collect()
+        }
+
+        return (item.clone(), score)
+    }
+
     let mut matches = vec![];
 
     for item in items {
@@ -80,20 +98,32 @@ pub fn fuzzy_match(text: &String, items: &Vec<String>) -> Vec<String> {
     results
 }
 
-pub fn fuzzy_find_match(text: &String, item: &String) -> (String, f64) {
-    let mut score = 1.0;
-    let mut item_copy = item.clone();
+#[cfg(test)]
+mod tests {
+    use super::simple_match;
 
-    for c in text.chars() {
-        score += match item_copy.find(c) {
-            Some(position) => (10.0 - position as f64),
-            None => {
-                score = 0.0;
-                break
-            }
-        };
-        item_copy = item_copy.chars().skip_while(|&x| x != c).collect()
+    #[test]
+    fn test_simple_match_normal_case() {
+        let match_results = simple_match(&"test".to_string(), &vec!["atest".to_string(), "test".to_string(), "testa".to_string(), "nomatch".to_string()]);
+        assert!(match_results.len() == 3);
+        assert!(match_results[0] == "test".to_string());
+        assert!(match_results[1] == "testa".to_string());
+        assert!(match_results[2] == "atest".to_string());
     }
 
-    return (item.clone(), score)
+    #[test]
+    fn test_simple_match_no_matches() {
+        let match_results = simple_match(&"bad-search".to_string(), &vec!["test1".to_string(), "test2".to_string(), "test3".to_string()]);
+        assert!(match_results.len() == 0);
+    }
+
+    // #[test]
+    // fn test_dmenu_match() {
+    //     let match_results = dmenu_match(&"test".to_string(), &vec!["atest".to_string(), "test".to_string(), "testa".to_string(), "nomatch".to_string()]);
+    // }
+    //
+    // #[test]
+    // fn test_fuzzy_match() {
+    //     let match_results = fuzzy_match(&"test".to_string(), &vec!["atest".to_string(), "test".to_string(), "testa".to_string(), "nomatch".to_string()]);
+    // }
 }
