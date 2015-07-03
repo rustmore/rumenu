@@ -217,27 +217,10 @@ impl UI {
         xlib::XFlush(self.display);
     }
 
-    unsafe fn draw_rect(&self, x: i32, y: i32, w: u32, h: u32, fill: bool, selected: bool) {
-        if selected {
-            xlib::XSetForeground(self.display, self.gc, self.selcolfg);
-            xlib::XSetBackground(self.display, self.gc, self.selcolbg);
-        } else {
-            xlib::XSetForeground(self.display, self.gc, self.colfg);
-            xlib::XSetBackground(self.display, self.gc, self.colbg);
-        }
-
-        if fill {
-            xlib::XFillRectangle(self.display, self.window, self.gc, self.x + x, self.y + y, w, h);
-        } else {
-            xlib::XDrawRectangle(self.display, self.window, self.gc, self.x + x, self.y + y, w-1, h-1);
-        }
-        xlib::XFlush(self.display);
-    }
-
-    unsafe fn draw_text(&self, x: i32, y: i32, text: &String, selected: bool) {
+    unsafe fn draw_text(&self, x: i32, y: i32, padding: u32, text: &String, selected: bool) {
         let width = self.text_width(text);
         let height = self.text_height() as i32;
-        self.draw_bg(x, y - height, width + 10, y as u32 + 5, selected);
+        self.draw_bg(x, y - height, width + padding, y as u32 + 5, selected);
 
         if selected {
             xlib::XSetForeground(self.display, self.gc, self.selcolfg);
@@ -247,7 +230,7 @@ impl UI {
             xlib::XSetBackground(self.display, self.gc, self.colbg);
         }
         xlib::XSetFont(self.display, self.gc, read(self.xfont).fid);
-        xlib::XDrawString(self.display, self.window, self.gc, x + 5, y, CString::new(text.clone()).unwrap().as_ptr(), text.len() as i32);
+        xlib::XDrawString(self.display, self.window, self.gc, x + padding as i32, y as i32, CString::new(text.clone()).unwrap().as_ptr(), text.len() as i32);
         xlib::XFlush(self.display);
     }
 
@@ -271,35 +254,46 @@ impl UI {
 
             // Draw Prompt
             if status.settings.prompt != "" {
-                self.draw_text(current_x_pos, font_height as i32, &status.settings.prompt, false);
+                self.draw_text(current_x_pos, font_height as i32, 5, &status.settings.prompt, false);
                 current_x_pos += self.text_width(&status.settings.prompt) as i32 + 4;
             }
 
             // Draw input
-            self.draw_text(current_x_pos, font_height as i32, &status.text, false);
-            // Draw cursor
-            self.draw_rect(current_x_pos + (self.text_width(&status.text[0..self.cursor].to_string()) as i32), 4, 1, font_height - 2, false, false);
-            current_x_pos += (input_width + 8) as i32;
+            self.draw_text(current_x_pos, font_height as i32, 0, &status.text, false);
 
-            // Draw prev icon
-            if status.page > 0 {
-                self.draw_text(current_x_pos, font_height as i32, &"<".to_string(), false);
-                current_x_pos += self.text_width(&"<".to_string()) as i32 + 4;
-            }
+            // Draw cursor
+            xlib::XSetForeground(self.display, self.gc, self.colfg);
+            xlib::XSetBackground(self.display, self.gc, self.colbg);
+            xlib::XDrawRectangle(
+                self.display,
+                self.window,
+                self.gc,
+                self.x + current_x_pos + (self.text_width(&status.text[0..self.cursor].to_string()) as i32),
+                self.y + 4, 0,
+                font_height - 3
+            );
+            xlib::XFlush(self.display);
+            current_x_pos += (input_width + 8) as i32;
 
             if status.settings.lines > 0 {
                 // Draw vertical matches
                 // TODO
             } else {
+                // Draw prev icon
+                if status.page > 0 {
+                    self.draw_text(current_x_pos, font_height as i32, 5, &"<".to_string(), false);
+                    current_x_pos += self.text_width(&"<".to_string()) as i32 + 4;
+                }
+
                 // Draw horizontal matches
                 let (match_items, pages) = self.get_items_page(&status, status.page);
                 if pages > status.page + 1 {
                     // Draw next icon and break
-                    self.draw_text(self.w as i32 - self.text_width(&">".to_string()) as i32 - 5, font_height as i32, &">".to_string(), false);
+                    self.draw_text(self.w as i32 - self.text_width(&">".to_string()) as i32 - 5, font_height as i32, 5, &">".to_string(), false);
                 }
 
                 for match_item in match_items {
-                    self.draw_text(current_x_pos, font_height as i32, &match_item, *match_item == status.selected);
+                    self.draw_text(current_x_pos, font_height as i32, 5, &match_item, *match_item == status.selected);
                     current_x_pos += (self.text_width(&match_item) + 10) as i32;
                 }
             }
