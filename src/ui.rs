@@ -153,7 +153,7 @@ impl UI {
     fn get_geometry(display: *mut xlib::Display, screen: i32, xfont: *mut xlib::XFontStruct) -> (u32, u32) {
         unsafe {
             let width = xlib::XDisplayWidth(display, screen) as u32;
-            let height = (read(xfont).max_bounds.ascent + read(xfont).max_bounds.descent + 2) as u32;
+            let height = (read(xfont).max_bounds.ascent + read(xfont).max_bounds.descent + 4) as u32;
             (width, height)
         }
     }
@@ -209,7 +209,7 @@ impl UI {
         let mut page_items = vec![];
         let mut current_x_pos = 0;
         for item in &status.matches {
-            let item_width = (self.text_width(&item) + 4) as i32;
+            let item_width = (self.text_width(&item) + 10) as i32;
             if current_x_pos + item_width > words_width {
                 current_page += 1;
                 current_x_pos = item_width;
@@ -260,7 +260,7 @@ impl UI {
     fn draw_text(&self, x: i32, y: i32, text: &String, selected: bool) {
         let width = self.text_width(text);
         let height = self.text_height() as i32;
-        self.draw_bg(x, y - height, width, y as u32, selected);
+        self.draw_bg(x, y - height, width + 10, y as u32 + 5, selected);
         unsafe {
             if selected {
                 xlib::XSetForeground(self.display, self.gc, self.selcolfg);
@@ -270,7 +270,7 @@ impl UI {
                 xlib::XSetBackground(self.display, self.gc, self.colbg);
             }
             xlib::XSetFont(self.display, self.gc, read(self.xfont).fid);
-            xlib::XDrawString(self.display, self.window, self.gc, x, y, CString::new(text.clone()).unwrap().as_ptr(), text.len() as i32);
+            xlib::XDrawString(self.display, self.window, self.gc, x + 5, y, CString::new(text.clone()).unwrap().as_ptr(), text.len() as i32);
             xlib::XFlush(self.display);
         }
     }
@@ -327,7 +327,7 @@ impl UI {
 
             for match_item in match_items {
                 self.draw_text(current_x_pos, font_height as i32, &match_item, *match_item == status.selected);
-                current_x_pos += (self.text_width(&match_item) + 4) as i32;
+                current_x_pos += (self.text_width(&match_item) + 10) as i32;
             }
         }
     }
