@@ -26,6 +26,8 @@ pub struct UI {
     window: xlib::Window,
     gc: xlib::GC,
     xfont: *mut xlib::XFontStruct,
+    font_width: i16,
+    font_height: u32,
     colfg: u64,
     colbg: u64,
     selcolfg: u64,
@@ -165,6 +167,8 @@ impl UI {
                 window: window,
                 gc: gc,
                 xfont: xfont,
+                font_height: (read(xfont).max_bounds.ascent + read(xfont).max_bounds.descent) as u32,
+                font_width: read(xfont).max_bounds.rbearing - read(xfont).min_bounds.lbearing,
                 colfg: color_fg,
                 colbg: color_bg,
                 selcolfg: sel_color_fg,
@@ -174,7 +178,7 @@ impl UI {
         }
     }
 
-    unsafe fn get_items_page(&self, status: &super::Status, page: u32) -> (Vec<String>, u32) {
+    unsafe fn get_items_page(&self, status: &super::Status) -> (Vec<String>, u32) {
         let mut current_page = 0;
 
         // Calculate the space for the words
@@ -196,7 +200,7 @@ impl UI {
                 current_x_pos = item_width;
             } else {
                 current_x_pos += item_width;
-                if current_page == page {
+                if current_page == status.page {
                     page_items.push(item.clone());
                 }
             }
@@ -219,7 +223,7 @@ impl UI {
 
     unsafe fn draw_text(&self, x: i32, y: i32, padding: u32, text: &String, selected: bool) {
         let width = self.text_width(text);
-        let height = self.text_height() as i32;
+        let height = self.font_height as i32;
         self.draw_bg(x, y - height, width + padding, y as u32 + 5, selected);
 
         if selected {
@@ -235,67 +239,78 @@ impl UI {
     }
 
     unsafe fn text_width(&self, text: &String) -> u32 {
-        let font_width = read(self.xfont).max_bounds.rbearing - read(self.xfont).min_bounds.lbearing;
-        (text.len() * font_width as usize) as u32
+        (text.len() * self.font_width as usize) as u32
     }
 
-    unsafe fn text_height(&self) -> u32 {
-        (read(self.xfont).max_bounds.ascent + read(self.xfont).max_bounds.descent) as u32
+    unsafe fn draw_horizontal_items(&self, x: i32, status: &super::Status) -> i32 {
+        let mut x_pos = x;
+
+        // Draw prev icon
+        if status.page > 0 {
+            self.draw_text(x_pos, self.font_height as i32, 5, &"<".to_string(), false);
+            x_pos += self.text_width(&"<".to_string()) as i32 + 4;
+        }
+
+        // Draw horizontal matches
+        let (match_items, pages) = self.get_items_page(&status);
+
+        if pages > status.page + 1 {
+            // Draw next icon and break
+            self.draw_text(self.w as i32 - self.text_width(&">".to_string()) as i32 - 5, self.font_height as i32, 5, &">".to_string(), false);
+        }
+
+        for match_item in match_items {
+            self.draw_text(x_pos, self.font_height as i32, 5, &match_item, *match_item == status.selected);
+            x_pos += (self.text_width(&match_item) + 10) as i32;
+        }
+        x_pos
+    }
+
+    unsafe fn draw_vertical_items(&self, x: i32, status: &super::Status) -> i32 {
+        unimplemented!();
+    }
+
+    unsafe fn draw_prompt(&self, x: i32, status: &super::Status) -> i32 {
+        if status.settings.prompt != "" {
+            self.draw_text(x, self.font_height as i32, 5, &status.settings.prompt, false);
+            x + self.text_width(&status.settings.prompt) as i32 + 4
+        } else { x }
+    }
+
+    unsafe fn draw_input(&self, x: i32, status: &super::Status) -> i32 {
+        let max_item_length = status.items.iter().fold(0, |acc, item| max(acc, item.len()));
+        let input_width = self.text_width(&"_".to_string()) * max_item_length as u32;
+
+        self.draw_text(x, self.font_height as i32, 0, &status.text, false);
+
+        // Draw cursor
+        xlib::XSetForeground(self.display, self.gc, self.colfg);
+        xlib::XSetBackground(self.display, self.gc, self.colbg);
+        xlib::XDrawRectangle(
+            self.display,
+            self.window,
+            self.gc,
+            self.x + x + (self.text_width(&status.text[0..self.cursor].to_string()) as i32),
+            self.y + 4, 0,
+            self.font_height - 3
+        );
+        xlib::XFlush(self.display);
+        x + (input_width + 8) as i32
     }
 
     pub fn draw_menu(&self, status: &super::Status) {
         unsafe {
             self.draw_bg(0, 0, self.w, self.h, false);
-            let max_item_length = status.items.iter().fold(0, |acc, item| max(acc, item.len()));
 
-            let input_width = self.text_width(&"_".to_string()) * max_item_length as u32;
-            let font_height = self.text_height();
-            let mut current_x_pos = 2;
+            let mut x_pos = 2;
 
-            // Draw Prompt
-            if status.settings.prompt != "" {
-                self.draw_text(current_x_pos, font_height as i32, 5, &status.settings.prompt, false);
-                current_x_pos += self.text_width(&status.settings.prompt) as i32 + 4;
-            }
-
-            // Draw input
-            self.draw_text(current_x_pos, font_height as i32, 0, &status.text, false);
-
-            // Draw cursor
-            xlib::XSetForeground(self.display, self.gc, self.colfg);
-            xlib::XSetBackground(self.display, self.gc, self.colbg);
-            xlib::XDrawRectangle(
-                self.display,
-                self.window,
-                self.gc,
-                self.x + current_x_pos + (self.text_width(&status.text[0..self.cursor].to_string()) as i32),
-                self.y + 4, 0,
-                font_height - 3
-            );
-            xlib::XFlush(self.display);
-            current_x_pos += (input_width + 8) as i32;
+            x_pos = self.draw_prompt(x_pos, &status);
+            x_pos = self.draw_input(x_pos, &status);
 
             if status.settings.lines > 0 {
-                // Draw vertical matches
-                // TODO
+                self.draw_vertical_items(x_pos, &status);
             } else {
-                // Draw prev icon
-                if status.page > 0 {
-                    self.draw_text(current_x_pos, font_height as i32, 5, &"<".to_string(), false);
-                    current_x_pos += self.text_width(&"<".to_string()) as i32 + 4;
-                }
-
-                // Draw horizontal matches
-                let (match_items, pages) = self.get_items_page(&status, status.page);
-                if pages > status.page + 1 {
-                    // Draw next icon and break
-                    self.draw_text(self.w as i32 - self.text_width(&">".to_string()) as i32 - 5, font_height as i32, 5, &">".to_string(), false);
-                }
-
-                for match_item in match_items {
-                    self.draw_text(current_x_pos, font_height as i32, 5, &match_item, *match_item == status.selected);
-                    current_x_pos += (self.text_width(&match_item) + 10) as i32;
-                }
+                self.draw_horizontal_items(x_pos, &status);
             }
         }
     }
