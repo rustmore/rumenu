@@ -34,166 +34,147 @@ pub struct UI {
 }
 
 impl UI {
-    fn setup_keyboard(display: *mut xlib::Display) {
+    unsafe fn setup_keyboard(display: *mut xlib::Display) {
         /* try to grab keyboard, we may have to wait for another process to ungrab */
         for _ in 1..1000 {
-            unsafe {
-                if xlib::XGrabKeyboard(display, xlib::XDefaultRootWindow(display), 1, xlib::GrabModeAsync, xlib::GrabModeAsync, xlib::CurrentTime) == xlib::GrabSuccess {
-                    return
-                }
-                sleep_ms(1000);
+            if xlib::XGrabKeyboard(display, xlib::XDefaultRootWindow(display), 1, xlib::GrabModeAsync, xlib::GrabModeAsync, xlib::CurrentTime) == xlib::GrabSuccess {
+                return
             }
+            sleep_ms(1000);
         }
         panic!("cannot grab keyboard");
     }
 
-    fn setup_display() -> *mut xlib::Display {
-        unsafe {
-            let mut display_env;
+    unsafe fn setup_display() -> *mut xlib::Display {
+        let mut display_env;
 
-            match env::var("DISPLAY") {
-                Ok(val) => display_env = CString::new(val).unwrap(),
-                Err(_) => display_env = CString::new("").unwrap(),
-            }
-
-            let display = xlib::XOpenDisplay(display_env.as_ptr());
-
-            if display == null_mut() {
-                panic!("Cannot connect to X Server: {}", from_utf8(display_env.as_bytes()).unwrap());
-            }
-            display
+        match env::var("DISPLAY") {
+            Ok(val) => display_env = CString::new(val).unwrap(),
+            Err(_) => display_env = CString::new("").unwrap(),
         }
+
+        let display = xlib::XOpenDisplay(display_env.as_ptr());
+
+        if display == null_mut() {
+            panic!("Cannot connect to X Server: {}", from_utf8(display_env.as_bytes()).unwrap());
+        }
+        display
     }
 
-    fn setup_colors(display: *mut xlib::Display, screen: i32, settings: &super::Settings) -> (u64, u64, u64, u64) {
-        unsafe {
-            let cmap = xlib::XDefaultColormap(display, screen);
+    unsafe fn setup_colors(display: *mut xlib::Display, screen: i32, settings: &super::Settings) -> (u64, u64, u64, u64) {
+        let cmap = xlib::XDefaultColormap(display, screen);
 
-            let mut color_fg: xlib::XColor = zeroed();
-            xlib::XAllocNamedColor(display, cmap, CString::new(settings.normfgcolor.clone()).unwrap().as_ptr(), &mut color_fg, &mut color_fg);
-            let mut color_bg: xlib::XColor = zeroed();
-            xlib::XAllocNamedColor(display, cmap, CString::new(settings.normbgcolor.clone()).unwrap().as_ptr(), &mut color_bg, &mut color_bg);
+        let mut color_fg: xlib::XColor = zeroed();
+        xlib::XAllocNamedColor(display, cmap, CString::new(settings.normfgcolor.clone()).unwrap().as_ptr(), &mut color_fg, &mut color_fg);
+        let mut color_bg: xlib::XColor = zeroed();
+        xlib::XAllocNamedColor(display, cmap, CString::new(settings.normbgcolor.clone()).unwrap().as_ptr(), &mut color_bg, &mut color_bg);
 
-            let mut sel_color_fg: xlib::XColor = zeroed();
-            xlib::XAllocNamedColor(display, cmap, CString::new(settings.selfgcolor.clone()).unwrap().as_ptr(), &mut sel_color_fg, &mut sel_color_fg);
-            let mut sel_color_bg: xlib::XColor = zeroed();
-            xlib::XAllocNamedColor(display, cmap, CString::new(settings.selbgcolor.clone()).unwrap().as_ptr(), &mut sel_color_bg, &mut sel_color_bg);
+        let mut sel_color_fg: xlib::XColor = zeroed();
+        xlib::XAllocNamedColor(display, cmap, CString::new(settings.selfgcolor.clone()).unwrap().as_ptr(), &mut sel_color_fg, &mut sel_color_fg);
+        let mut sel_color_bg: xlib::XColor = zeroed();
+        xlib::XAllocNamedColor(display, cmap, CString::new(settings.selbgcolor.clone()).unwrap().as_ptr(), &mut sel_color_bg, &mut sel_color_bg);
 
-            (color_fg.pixel, color_bg.pixel, sel_color_fg.pixel, sel_color_bg.pixel)
-        }
+        (color_fg.pixel, color_bg.pixel, sel_color_fg.pixel, sel_color_bg.pixel)
     }
 
-    fn setup_window(display: *mut xlib::Display, root: u64, width: u32, height: u32, color_bg: u64) -> xlib::Window {
-        unsafe {
-            let mut attributes: xlib::XSetWindowAttributes = zeroed();
-            attributes.background_pixel = color_bg;
-            attributes.override_redirect = 1;
-            attributes.event_mask =  xlib::StructureNotifyMask | xlib::ExposureMask | xlib::KeyPressMask | xlib::VisibilityChangeMask;
+    unsafe fn setup_window(display: *mut xlib::Display, root: u64, width: u32, height: u32, color_bg: u64) -> xlib::Window {
+        let mut attributes: xlib::XSetWindowAttributes = zeroed();
+        attributes.background_pixel = color_bg;
+        attributes.override_redirect = 1;
+        attributes.event_mask =  xlib::StructureNotifyMask | xlib::ExposureMask | xlib::KeyPressMask | xlib::VisibilityChangeMask;
 
 
-            let window = xlib::XCreateWindow(display, root, 0, 0, width, height, 0, 0,
-                                             xlib::InputOutput as c_uint, null_mut(),
-                                             xlib::CWOverrideRedirect | xlib::CWBackPixel | xlib::CWEventMask, &mut attributes);
-            // Show window
-            xlib::XMapWindow(display, window);
-            xlib::XFlush(display);
-            window
-        }
+        let window = xlib::XCreateWindow(display, root, 0, 0, width, height, 0, 0,
+                                         xlib::InputOutput as c_uint, null_mut(),
+                                         xlib::CWOverrideRedirect | xlib::CWBackPixel | xlib::CWEventMask, &mut attributes);
+        // Show window
+        xlib::XMapWindow(display, window);
+        xlib::XFlush(display);
+        window
     }
 
-    fn setup_gc(display: *mut xlib::Display, window: xlib::Window, color_fg: u64, color_bg: u64) -> xlib::GC {
-        unsafe {
-            let mut values: xlib::XGCValues = zeroed();
-            let valuesmask: u64 = 0 as u64;
+    unsafe fn setup_gc(display: *mut xlib::Display, window: xlib::Window, color_fg: u64, color_bg: u64) -> xlib::GC {
+        let mut values: xlib::XGCValues = zeroed();
+        let valuesmask: u64 = 0 as u64;
 
-            let gc = xlib::XCreateGC(display, window, valuesmask, &mut values);
-            xlib::XSetForeground(display, gc, color_fg);
-            xlib::XSetBackground(display, gc, color_bg);
+        let gc = xlib::XCreateGC(display, window, valuesmask, &mut values);
+        xlib::XSetForeground(display, gc, color_fg);
+        xlib::XSetBackground(display, gc, color_bg);
 
-            xlib::XSetLineAttributes(display, gc, 1, xlib::LineSolid, xlib::CapButt, xlib::JoinMiter);
-            xlib::XSetFillStyle(display, gc, xlib::FillSolid);
+        xlib::XSetLineAttributes(display, gc, 1, xlib::LineSolid, xlib::CapButt, xlib::JoinMiter);
+        xlib::XSetFillStyle(display, gc, xlib::FillSolid);
 
-            xlib::XSync(display, 1);
-            xlib::XFlush(display);
-            gc
-        }
+        xlib::XSync(display, 1);
+        xlib::XFlush(display);
+        gc
     }
 
-    fn setup_font(display: *mut xlib::Display, font_name: &String) -> *mut xlib::XFontStruct {
-        unsafe{
-            let fontstr = CString::new(font_name.clone()).unwrap();
-            xlib::XLoadQueryFont(display, fontstr.as_ptr())
-        }
+    unsafe fn setup_font(display: *mut xlib::Display, font_name: &String) -> *mut xlib::XFontStruct {
+        let fontstr = CString::new(font_name.clone()).unwrap();
+        xlib::XLoadQueryFont(display, fontstr.as_ptr())
     }
 
-    fn wait_until_map_notify(display: *mut xlib::Display) {
-        unsafe{
-            loop {
-                let mut e = zeroed();
-                xlib::XNextEvent(display, &mut e);
-                if e.get_type() == xlib::MapNotify {
-                    break;
-                }
+    unsafe fn wait_until_map_notify(display: *mut xlib::Display) {
+        loop {
+            let mut e = zeroed();
+            xlib::XNextEvent(display, &mut e);
+            if e.get_type() == xlib::MapNotify {
+                break;
             }
         }
     }
 
-    fn get_screen(display: *mut xlib::Display) -> i32 {
-        unsafe {
-            xlib::XDefaultScreen(display)
-        }
+    unsafe fn get_screen(display: *mut xlib::Display) -> i32 {
+        xlib::XDefaultScreen(display)
     }
 
-    fn get_root_window(display: *mut xlib::Display, screen: i32) -> xlib::Window {
-        unsafe {
-            xlib::XRootWindow(display, screen)
-        }
+    unsafe fn get_root_window(display: *mut xlib::Display, screen: i32) -> xlib::Window {
+        xlib::XRootWindow(display, screen)
     }
 
-    fn get_geometry(display: *mut xlib::Display, screen: i32, xfont: *mut xlib::XFontStruct) -> (u32, u32) {
-        unsafe {
-            let width = xlib::XDisplayWidth(display, screen) as u32;
-            let height = (read(xfont).max_bounds.ascent + read(xfont).max_bounds.descent + 4) as u32;
-            (width, height)
-        }
+    unsafe fn get_geometry(display: *mut xlib::Display, screen: i32, xfont: *mut xlib::XFontStruct) -> (u32, u32) {
+        let width = xlib::XDisplayWidth(display, screen) as u32;
+        let height = (read(xfont).max_bounds.ascent + read(xfont).max_bounds.descent + 4) as u32;
+        (width, height)
     }
 
     pub fn new(settings: &super::Settings) -> UI {
-        let display = UI::setup_display();
-        UI::setup_keyboard(display);
-        let screen = UI::get_screen(display);
-        let root = UI::get_root_window(display, screen);
+        unsafe {
+            let display = UI::setup_display();
+            UI::setup_keyboard(display);
+            let screen = UI::get_screen(display);
+            let root = UI::get_root_window(display, screen);
 
-        let (color_fg, color_bg, sel_color_fg, sel_color_bg) = UI::setup_colors(display, screen, &settings);
+            let (color_fg, color_bg, sel_color_fg, sel_color_bg) = UI::setup_colors(display, screen, &settings);
 
-        let xfont = UI::setup_font(display, &settings.font);
+            let xfont = UI::setup_font(display, &settings.font);
 
-        let (width, height) = UI::get_geometry(display, screen, xfont);
+            let (width, height) = UI::get_geometry(display, screen, xfont);
 
-        let window = UI::setup_window(display, root, width, height, color_bg);
+            let window = UI::setup_window(display, root, width, height, color_bg);
 
-        UI::wait_until_map_notify(display);
+            UI::wait_until_map_notify(display);
 
-        let gc = UI::setup_gc(display, window, color_fg, color_bg);
-
-        UI {
-            x: 0,
-            y: 0,
-            w: width,
-            h: height,
-            display: display,
-            window: window,
-            gc: gc,
-            xfont: xfont,
-            colfg: color_fg,
-            colbg: color_bg,
-            selcolfg: sel_color_fg,
-            selcolbg: sel_color_bg,
-            cursor: 0,
+            let gc = UI::setup_gc(display, window, color_fg, color_bg);
+            UI {
+                x: 0,
+                y: 0,
+                w: width,
+                h: height,
+                display: display,
+                window: window,
+                gc: gc,
+                xfont: xfont,
+                colfg: color_fg,
+                colbg: color_bg,
+                selcolfg: sel_color_fg,
+                selcolbg: sel_color_bg,
+                cursor: 0,
+            }
         }
     }
 
-    fn get_items_page(&self, status: &super::Status, page: u32) -> (Vec<String>, u32) {
+    unsafe fn get_items_page(&self, status: &super::Status, page: u32) -> (Vec<String>, u32) {
         let mut current_page = 0;
 
         // Calculate the space for the words
@@ -223,111 +204,104 @@ impl UI {
         (page_items, current_page + 1)
     }
 
-    fn draw_bg(&self, x: i32, y: i32, w: u32, h: u32, selected: bool) {
-        unsafe {
-            if selected {
-                xlib::XSetForeground(self.display, self.gc, self.selcolbg);
-                xlib::XSetBackground(self.display, self.gc, self.selcolfg);
-            } else {
-                xlib::XSetForeground(self.display, self.gc, self.colbg);
-                xlib::XSetBackground(self.display, self.gc, self.colfg);
-            }
+    unsafe fn draw_bg(&self, x: i32, y: i32, w: u32, h: u32, selected: bool) {
+        if selected {
+            xlib::XSetForeground(self.display, self.gc, self.selcolbg);
+            xlib::XSetBackground(self.display, self.gc, self.selcolfg);
+        } else {
+            xlib::XSetForeground(self.display, self.gc, self.colbg);
+            xlib::XSetBackground(self.display, self.gc, self.colfg);
+        }
 
+        xlib::XFillRectangle(self.display, self.window, self.gc, self.x + x, self.y + y, w, h);
+        xlib::XFlush(self.display);
+    }
+
+    unsafe fn draw_rect(&self, x: i32, y: i32, w: u32, h: u32, fill: bool, selected: bool) {
+        if selected {
+            xlib::XSetForeground(self.display, self.gc, self.selcolfg);
+            xlib::XSetBackground(self.display, self.gc, self.selcolbg);
+        } else {
+            xlib::XSetForeground(self.display, self.gc, self.colfg);
+            xlib::XSetBackground(self.display, self.gc, self.colbg);
+        }
+
+        if fill {
             xlib::XFillRectangle(self.display, self.window, self.gc, self.x + x, self.y + y, w, h);
-            xlib::XFlush(self.display);
+        } else {
+            xlib::XDrawRectangle(self.display, self.window, self.gc, self.x + x, self.y + y, w-1, h-1);
         }
+        xlib::XFlush(self.display);
     }
 
-    fn draw_rect(&self, x: i32, y: i32, w: u32, h: u32, fill: bool, selected: bool) {
-        unsafe {
-            if selected {
-                xlib::XSetForeground(self.display, self.gc, self.selcolfg);
-                xlib::XSetBackground(self.display, self.gc, self.selcolbg);
-            } else {
-                xlib::XSetForeground(self.display, self.gc, self.colfg);
-                xlib::XSetBackground(self.display, self.gc, self.colbg);
-            }
-
-            if fill {
-                xlib::XFillRectangle(self.display, self.window, self.gc, self.x + x, self.y + y, w, h);
-            } else {
-                xlib::XDrawRectangle(self.display, self.window, self.gc, self.x + x, self.y + y, w-1, h-1);
-            }
-            xlib::XFlush(self.display);
-        }
-    }
-
-    fn draw_text(&self, x: i32, y: i32, text: &String, selected: bool) {
+    unsafe fn draw_text(&self, x: i32, y: i32, text: &String, selected: bool) {
         let width = self.text_width(text);
         let height = self.text_height() as i32;
         self.draw_bg(x, y - height, width + 10, y as u32 + 5, selected);
-        unsafe {
-            if selected {
-                xlib::XSetForeground(self.display, self.gc, self.selcolfg);
-                xlib::XSetBackground(self.display, self.gc, self.selcolbg);
-            } else {
-                xlib::XSetForeground(self.display, self.gc, self.colfg);
-                xlib::XSetBackground(self.display, self.gc, self.colbg);
-            }
-            xlib::XSetFont(self.display, self.gc, read(self.xfont).fid);
-            xlib::XDrawString(self.display, self.window, self.gc, x + 5, y, CString::new(text.clone()).unwrap().as_ptr(), text.len() as i32);
-            xlib::XFlush(self.display);
+
+        if selected {
+            xlib::XSetForeground(self.display, self.gc, self.selcolfg);
+            xlib::XSetBackground(self.display, self.gc, self.selcolbg);
+        } else {
+            xlib::XSetForeground(self.display, self.gc, self.colfg);
+            xlib::XSetBackground(self.display, self.gc, self.colbg);
         }
+        xlib::XSetFont(self.display, self.gc, read(self.xfont).fid);
+        xlib::XDrawString(self.display, self.window, self.gc, x + 5, y, CString::new(text.clone()).unwrap().as_ptr(), text.len() as i32);
+        xlib::XFlush(self.display);
     }
 
-    fn text_width(&self, text: &String) -> u32 {
-        unsafe {
-            let font_width = read(self.xfont).max_bounds.rbearing - read(self.xfont).min_bounds.lbearing;
-            (text.len() * font_width as usize) as u32
-        }
+    unsafe fn text_width(&self, text: &String) -> u32 {
+        let font_width = read(self.xfont).max_bounds.rbearing - read(self.xfont).min_bounds.lbearing;
+        (text.len() * font_width as usize) as u32
     }
 
-    fn text_height(&self) -> u32 {
-        unsafe{
-            (read(self.xfont).max_bounds.ascent + read(self.xfont).max_bounds.descent) as u32
-        }
+    unsafe fn text_height(&self) -> u32 {
+        (read(self.xfont).max_bounds.ascent + read(self.xfont).max_bounds.descent) as u32
     }
 
     pub fn draw_menu(&self, status: &super::Status) {
-        self.draw_bg(0, 0, self.w, self.h, false);
-        let max_item_length = status.items.iter().fold(0, |acc, item| max(acc, item.len()));
+        unsafe {
+            self.draw_bg(0, 0, self.w, self.h, false);
+            let max_item_length = status.items.iter().fold(0, |acc, item| max(acc, item.len()));
 
-        let input_width = self.text_width(&"_".to_string()) * max_item_length as u32;
-        let font_height = self.text_height();
-        let mut current_x_pos = 2;
+            let input_width = self.text_width(&"_".to_string()) * max_item_length as u32;
+            let font_height = self.text_height();
+            let mut current_x_pos = 2;
 
-        // Draw Prompt
-        if status.settings.prompt != "" {
-            self.draw_text(current_x_pos, font_height as i32, &status.settings.prompt, false);
-            current_x_pos += self.text_width(&status.settings.prompt) as i32 + 4;
-        }
-
-        // Draw input
-        self.draw_text(current_x_pos, font_height as i32, &status.text, false);
-        // Draw cursor
-        self.draw_rect(current_x_pos + (self.text_width(&status.text[0..self.cursor].to_string()) as i32), 4, 1, font_height - 2, false, false);
-        current_x_pos += (input_width + 8) as i32;
-
-        // Draw prev icon
-        if status.page > 0 {
-            self.draw_text(current_x_pos, font_height as i32, &"<".to_string(), false);
-            current_x_pos += self.text_width(&"<".to_string()) as i32 + 4;
-        }
-
-        if status.settings.lines > 0 {
-            // Draw vertical matches
-            // TODO
-        } else {
-            // Draw horizontal matches
-            let (match_items, pages) = self.get_items_page(&status, status.page);
-            if pages > status.page + 1 {
-                // Draw next icon and break
-                self.draw_text(self.w as i32 - self.text_width(&">".to_string()) as i32 - 5, font_height as i32, &">".to_string(), false);
+            // Draw Prompt
+            if status.settings.prompt != "" {
+                self.draw_text(current_x_pos, font_height as i32, &status.settings.prompt, false);
+                current_x_pos += self.text_width(&status.settings.prompt) as i32 + 4;
             }
 
-            for match_item in match_items {
-                self.draw_text(current_x_pos, font_height as i32, &match_item, *match_item == status.selected);
-                current_x_pos += (self.text_width(&match_item) + 10) as i32;
+            // Draw input
+            self.draw_text(current_x_pos, font_height as i32, &status.text, false);
+            // Draw cursor
+            self.draw_rect(current_x_pos + (self.text_width(&status.text[0..self.cursor].to_string()) as i32), 4, 1, font_height - 2, false, false);
+            current_x_pos += (input_width + 8) as i32;
+
+            // Draw prev icon
+            if status.page > 0 {
+                self.draw_text(current_x_pos, font_height as i32, &"<".to_string(), false);
+                current_x_pos += self.text_width(&"<".to_string()) as i32 + 4;
+            }
+
+            if status.settings.lines > 0 {
+                // Draw vertical matches
+                // TODO
+            } else {
+                // Draw horizontal matches
+                let (match_items, pages) = self.get_items_page(&status, status.page);
+                if pages > status.page + 1 {
+                    // Draw next icon and break
+                    self.draw_text(self.w as i32 - self.text_width(&">".to_string()) as i32 - 5, font_height as i32, &">".to_string(), false);
+                }
+
+                for match_item in match_items {
+                    self.draw_text(current_x_pos, font_height as i32, &match_item, *match_item == status.selected);
+                    current_x_pos += (self.text_width(&match_item) + 10) as i32;
+                }
             }
         }
     }
